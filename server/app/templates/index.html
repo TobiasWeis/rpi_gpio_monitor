@@ -1,0 +1,87 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="home">
+    <h1><i class="fa fa-list-alt"></i> GPIO Logger/Visualizer</h1>
+    <p>Lets log some data!</p>
+
+    <div id="graph" style="width:100%; height:300px;"></div>
+
+    <div class="row">
+        <div class="col-sm-2">
+            <button class="btn btn-secondary" type="button" id="btn_capture">Getting status</button>
+        </div>
+        <div class="col-sm">
+        </div>
+        <div class="col-sm-2">
+            <button class="btn btn-danger" type="button" id="btn_capture" onclick="reset()"><i class="fa fa-trash"></i> Delete values</button>
+        </div>
+    </div>
+
+    <script>
+        function start_capture(){
+            jQuery.get("/capture/start", function(data,status){
+                console.log(data);
+            });
+        }
+
+        function stop_capture(){
+            jQuery.get("/capture/stop", function(data,status){
+                console.log(data);
+            });
+        }
+
+        function reset(){
+            jQuery.get("/capture/reset", function(data,status){
+                console.log(data);
+            })
+        }
+
+        function update(){
+            jQuery.get("/capture/status", function(data,status){
+                if(data.status == 0){
+                    $("#btn_capture").text("Start capture");
+                    $("#btn_capture").removeClass("btn-danger").removeClass("btn-secondary").addClass("btn-success");
+                    $("#btn_capture").attr("onclick","start_capture()");
+                    $("#btn_capture").prop("disabled",false);
+                }else{
+                    $("#btn_capture").text("Stop capture");
+                    $("#btn_capture").removeClass("btn-success").removeClass("btn-secondary").addClass("btn-danger");
+                    $("#btn_capture").attr("onclick","stop_capture()");
+                    $("#btn_capture").prop("disabled",false);
+                }
+            }).fail(function(){
+                    $("#btn_capture").text("No Contact");
+                    $("#btn_capture").removeClass("btn-danger").removeClass("btn-success").addClass("btn-secondary")
+                    $("#btn_capture").prop("disabled",true);
+            });
+
+
+            jQuery.get("/capture/", function(data,status){
+                var tstamps = [];
+                var values = [];
+
+                for(var i=0;i<data.length;i++){
+                    tstamps.push(new Date(data[i].timestamp));
+                    values.push(data[i].value);
+                }
+
+
+                GRAPH = document.getElementById('graph');
+                var data_timeline = [
+                    {
+                        y: values,
+                        x: tstamps,
+                    }
+                ];
+
+                Plotly.newPlot(GRAPH, data_timeline);
+            });
+
+            setTimeout(function(){update();}, 1000);
+        }
+
+        update();
+
+    </script>
+</div>
+{% endblock %}
