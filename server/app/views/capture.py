@@ -34,7 +34,8 @@ class CaptureThread(threading.Thread):
 
             while not self.stopRequest:
                 current_value = GPIO.input(self.input_pin)
-                last_entry = db.session.query(SensorEntry).order_by(SensorEntry.id.desc()).first()
+                last_entry = db.session.query(SensorEntry).filter(SensorEntry.gpio == "%d"%self.input_pin).order_by(SensorEntry.id.desc()).first()
+
                 if last_entry is not None:
                     last_value = last_entry.value
                 else:
@@ -70,28 +71,27 @@ class CaptureThread(threading.Thread):
 
 @capture_blueprint.route('/', methods=['GET'])
 def values():
-    input_pin = 11
-    ses = SensorEntry.query.filter(SensorEntry.gpio == "%d"%input_pin).order_by(SensorEntry.id.desc()).limit(1000)
     ret = []
-    for se in ses:
-        ret.append(GetRowVals(se))
+    for input_pin in range(41):
+        ret_i = []
+        ses = SensorEntry.query.filter(SensorEntry.gpio == "%d"%input_pin).order_by(SensorEntry.id.desc()).limit(1000)
+        for se in ses:
+            ret_i.append(GetRowVals(se))
+        ret.append(ret_i)
     return make_response(jsonify(ret), 200)
 
-@capture_blueprint.route('/start', methods=['GET'])
-def start():
-    input_pin = 11
+@capture_blueprint.route('/start/<int:input_pin>', methods=['GET'])
+def start(input_pin):
     thr = CaptureThread(flask.current_app._get_current_object(), input_pin)
     thr.daemon = True
-    thr.name = "CaptureThread_%d" % input_pin
+    thr.name = "%d" % input_pin
     thr.start()
 
     return make_response(jsonify({'msg':'OK'}),200)
 
-@capture_blueprint.route('/stop', methods=['GET'])
-def stop():
-    input_pin = 11
-
-    thread = get_thread_by_name("CaptureThread_%d"%input_pin)
+@capture_blueprint.route('/stop/<int:input_pin>', methods=['GET'])
+def stop(input_pin):
+    thread = get_thread_by_name("%d"%input_pin)
     if thread:
         thread.stop()
         return make_response(jsonify({'msg':'OK'}),200)
@@ -100,16 +100,20 @@ def stop():
 
 @capture_blueprint.route('/status', methods=['GET'])
 def status():
-    input_pin = 11
-    thread = get_thread_by_name("CaptureThread_%d" % input_pin)
-    if thread:
-        return make_response(jsonify({'status':1}))
-    else:
-        return make_response(jsonify({'status':0}))
+    ret = []
 
-@capture_blueprint.route('/reset', methods=['GET'])
-def reset():
-    input_pin = 11
+    for input_pin in range(41):
+        thread = get_thread_by_name("%d" % input_pin)
+        if thread:
+            ret.append({'status':1})
+        else:
+            ret.append({'status':0})
+
+    return make_response(jsonify(ret))
+
+@capture_blueprint.route('/reset/<int:input_pin>', methods=['GET'])
+def reset(input_pin):
     SensorEntry.query.filter(SensorEntry.gpio == "%d" %input_pin).delete()
     db.session.commit()
+
     return make_response(jsonify({'msg':'OK'}),200)
